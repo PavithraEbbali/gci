@@ -7,6 +7,65 @@ Format: newest entry at the top. Each entry records what changed and why.
 
 ---
 
+## [3.1.0] — Mobile responsiveness, GitHub, Vercel
+
+### Responsive audit
+
+Measured at 320 / 360 / 375 / 414 / 540 / 768 / 900 / 1024 px rather than eyed,
+checking document width against viewport, every element's box, computed font
+sizes and tap-target heights.
+
+**No horizontal overflow at any width**, before or after. The elements flagged
+as extending past the viewport are all deliberately clipped decoration — the
+105%-scaled hero photograph, the marquee track, the medallion orbits.
+
+Four real problems, all fixed:
+
+| Problem | Was | Now |
+|---|---|---|
+| H1 at 320px | 38px over 5 lines | 31px over 3 lines |
+| Offer medallion at 320px | 256px — 80% of the screen | 192px, stepped up by breakpoint |
+| Smallest text | 9px | 10px |
+| Footer tap targets | 17px tall | 44px |
+
+The headings were the root cause: every `clamp()` had a floor too high for a
+small screen, so the `vw` term never engaged and the minimum always won. Floors
+lowered and the `vw` terms raised across all headings, hero copy and the
+medallion, so type now genuinely scales down rather than clamping flat.
+
+Medallion, orbits and glow now step through breakpoints together
+(`12rem → 16rem → 18rem → clamp`), so the whole assembly including its rings
+fits inside a 320px screen with margin to spare.
+
+### Touch behaviour
+
+**Tilt and magnetic effects are now gated behind `(hover: hover) and
+(pointer: fine)`.** Touch screens synthesise a `mousemove` on tap but never
+fire `mouseleave`, so a tapped card stayed stuck mid-tilt. New
+`useFinePointer()` hook for the React build, an equivalent media query check in
+the static build. It starts false so server and client render agree.
+
+### Repository
+
+Pushed to `github.com/PavithraEbbali/gci` on `main`. 67 files, no
+`node_modules`, images 1.2 MB total.
+
+- `.gitignore` covers `node_modules`, `.next`, the generated `build/*.mjs`
+  bundles and local QA scratch files
+- `README.md` documents both builds, the content architecture, the omitted
+  service lines and the pre-launch placeholders
+- `playwright` removed from devDependencies — it was only ever a QA tool
+
+### Vercel
+
+Auto-detected as a Next.js app at the repository root; no `vercel.json` needed.
+Clean production build: 12 routes, all static, 181 kB first load.
+
+**One environment variable must be set** or social link previews resolve against
+localhost: `NEXT_PUBLIC_SITE_URL`. Documented in `.env.example` and the README.
+
+---
+
 ## [3.0.0] — Static HTML build
 
 The whole site now also exists as plain HTML, CSS and vanilla JavaScript in

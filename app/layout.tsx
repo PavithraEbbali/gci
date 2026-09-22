@@ -21,6 +21,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  // resolveSiteUrl() always returns a parseable origin, so this cannot throw
   metadataBase: new URL(site.siteUrl),
   title: site.metaTitle,
   description: site.metaDescription,

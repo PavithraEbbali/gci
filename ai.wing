@@ -7,6 +7,59 @@ Format: newest entry at the top. Each entry records what changed and why.
 
 ---
 
+## [3.1.1] — Vercel build failure and security upgrade
+
+### The build failure
+
+```
+Failed to collect configuration for /_not-found
+  TypeError: Invalid URL  code: ERR_INVALID_URL  input: ''
+```
+
+`metadataBase: new URL(site.siteUrl)` threw during page-data collection because
+`siteUrl` resolved to an empty string.
+
+The cause was `process.env.NEXT_PUBLIC_SITE_URL ?? 'https://example.com'`.
+Next inlines an undefined `NEXT_PUBLIC_*` variable as `""` at build time, and
+`??` only falls back on `null` or `undefined` — an empty string sails straight
+through. Reproduced locally with `NEXT_PUBLIC_SITE_URL="" next build` before
+changing anything.
+
+Replaced with `resolveSiteUrl()`, which walks a candidate list, treats empty
+and whitespace values as unset, prepends a scheme when one is missing, and
+**parses each candidate before accepting it** so a malformed value falls
+through to the next rather than failing the build.
+
+Candidates, in order: `NEXT_PUBLIC_SITE_URL`, then Vercel's
+`VERCEL_PROJECT_PRODUCTION_URL` and `VERCEL_URL`, then a placeholder. That
+means a fresh Vercel import now works with **no configuration at all** — the
+env var only matters once a real domain is attached.
+
+Every path verified: empty, whitespace-only, malformed, scheme-less, explicit,
+both Vercel variables, and nothing set. Malformed-plus-Vercel correctly falls
+through to the Vercel URL.
+
+### Security
+
+Vercel's log also flagged `next@15.5.4` for CVE-2025-66478.
+
+- Next upgraded **15.5.4 → 15.5.25** (patch-level, same minor)
+- `npm audit fix` cleared the `sharp` libvips CVEs
+- Production vulnerabilities went 3 → 1
+
+The one remaining is `postcss`, flagged for XSS via unescaped `</style>` in its
+stringify output. **It is not fixable and not exploitable here:** we are already
+on 8.5.28, the latest published version, so no patched release exists yet; and
+PostCSS only runs at build time over CSS we author. It never sees untrusted
+input and never runs in a browser or at request time.
+
+### Verified
+
+Clean `next build` with no environment variables set — the exact condition that
+failed on Vercel — now produces 12 static routes with no errors.
+
+---
+
 ## [3.1.0] — Mobile responsiveness, GitHub, Vercel
 
 ### Responsive audit

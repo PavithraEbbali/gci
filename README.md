@@ -29,15 +29,14 @@ Then open <http://localhost:3000>.
 Vercel auto-detects the Next.js app at the repository root — no configuration
 file is needed. Import the repo and deploy.
 
-**One environment variable must be set**, or social link previews will resolve
-against `localhost` and break:
+Social share image URLs need an absolute origin. On Vercel this is detected
+automatically from the deployment, so a fresh import works without any
+configuration.
 
-| Variable | Value |
-|---|---|
-| `NEXT_PUBLIC_SITE_URL` | The deployment's public origin, e.g. `https://gci.vercel.app` |
-
-Set it under **Project → Settings → Environment Variables**, then redeploy.
-See `.env.example`.
+**Once you point a real domain at it**, set `NEXT_PUBLIC_SITE_URL` to that
+origin under **Project → Settings → Environment Variables** and redeploy —
+otherwise link previews keep pointing at the `.vercel.app` URL. See
+`.env.example`.
 
 ## Rebuilding the static HTML
 
@@ -115,8 +114,9 @@ ai.wing                 changelog
 
 - `site.phoneDisplay` / `site.phoneHref` in `lib/content.ts` hold a **placeholder**
   number in the reserved 555-01xx range. Replace before launch.
-- `site.siteUrl` defaults to `https://example.com`. Override with
-  `NEXT_PUBLIC_SITE_URL`.
+- The site origin resolves from `NEXT_PUBLIC_SITE_URL`, then Vercel's own
+  deployment URL, then a placeholder. Empty and malformed values fall through
+  rather than failing the build.
 - The legal pages are editorial, not legal advice. Have counsel review them.
 - This site is an independent authorized retailer's, not GCI's. The disclosure
   bar and footer attribution must stay.

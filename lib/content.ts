@@ -56,7 +56,45 @@ export interface ServiceSection {
   footnote?: string;
 }
 
+/* ------------------------------------------------------------- site URL --- */
+
+/**
+ * Resolve the absolute origin for OpenGraph and Twitter card images.
+ *
+ * Order: an explicit NEXT_PUBLIC_SITE_URL, then whatever Vercel exposes about
+ * the current deployment, then a placeholder.
+ *
+ * Empty strings count as unset. Next inlines an undefined NEXT_PUBLIC_* var as
+ * `""` at build time, and `??` does not catch that — which is exactly what
+ * broke the first Vercel build, with `new URL('')` throwing during page-data
+ * collection. Each candidate is also parsed before being accepted, so a
+ * malformed value falls through instead of failing the build.
+ */
+function resolveSiteUrl(): string {
+  const candidates = [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    process.env.NEXT_PUBLIC_VERCEL_URL,
+    process.env.VERCEL_URL,
+  ];
+
+  for (const raw of candidates) {
+    const value = raw?.trim();
+    if (!value) continue;
+    const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    try {
+      return new URL(withProtocol).origin;
+    } catch {
+      // malformed — fall through to the next candidate
+    }
+  }
+
+  return 'https://example.com';
+}
+
 /* ------------------------------------------------------------ site meta --- */
+
 
 export const site = {
   /* ---------------------------------------------------------------------
@@ -77,11 +115,11 @@ export const site = {
     'This site is operated by an independent authorized retailer of GCI and is not operated by GCI. GCI, GCI+, Fiber+, AK-Fi, red Unlimited and Atmos Rewards are trademarks of GCI Communication Corp. and its affiliates. Plan names, speeds, promotional terms and pricing reflect current GCI residential offers and are subject to change, availability and qualification.',
 
   /* ---------------------------------------------------------------------
-   * PLACEHOLDER — replace with the live domain before launch, or set
-   * NEXT_PUBLIC_SITE_URL in the environment. Social share images resolve
-   * against this; leaving it wrong breaks link previews.
+   * Absolute origin used to resolve social share image URLs. Set
+   * NEXT_PUBLIC_SITE_URL to the real domain before launch; on Vercel this
+   * falls back to the deployment's own URL so previews work untouched.
    * ------------------------------------------------------------------- */
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://example.com',
+  siteUrl: resolveSiteUrl(),
 
   metaTitle: 'GCI Internet, Mobile & Home Phone in Alaska | Authorized Retailer',
   metaDescription:

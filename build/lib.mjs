@@ -294,7 +294,10 @@ export function page({ title, description, body, home = '', ogImage }) {
 <meta property="og:title" content="${escAttr(title)}">
 <meta property="og:description" content="${escAttr(description)}">
 <meta property="og:type" content="website">
-${ogImage ? `<meta property="og:image" content="${escAttr(ogImage)}">` : ''}
+${ogImage ? `<meta property="og:image" content="${escAttr(ogImage)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:image" content="${escAttr(ogImage)}">` : ''}
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

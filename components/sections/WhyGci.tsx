@@ -114,7 +114,22 @@ export default function WhyGci() {
 
           {/* ---- closing CTA band ---- */}
           <Reveal delay={0.1}>
-            <div className="canvas-midnight-deep mt-14 flex flex-col items-start justify-between gap-7 overflow-hidden rounded-[1.75rem] p-8 lg:mt-16 lg:flex-row lg:items-center lg:p-10">
+            <div className="canvas-midnight-deep relative isolate mt-14 flex flex-col items-start justify-between gap-7 overflow-hidden rounded-[1.75rem] p-8 lg:mt-16 lg:flex-row lg:items-center lg:p-10">
+              {/*
+                Lit homes in a remote coastal community, behind a heavy scrim.
+                The same frame doubles as the social share card.
+              */}
+              <Image
+                src={imageAssets.og.src}
+                alt=""
+                fill
+                sizes="(max-width: 1024px) 100vw, 75vw"
+                className="-z-10 object-cover object-center"
+              />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 -z-10 bg-gci-midnight/78"
+              />
               <div className="max-w-[36rem]">
                 <h3 className="display text-[clamp(1.25rem,5vw,1.95rem)] text-white">
                   Confirm what is available at your address

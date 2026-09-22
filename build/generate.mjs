@@ -479,7 +479,9 @@ function whySection() {
     </div>
 
     <div class="reveal" style="--delay:0.1s">
-      <div class="canvas-midnight-deep mt-14 flex flex-col items-start justify-between gap-7 overflow-hidden rounded-[1.75rem] p-8 lg:mt-16 lg:flex-row lg:items-center lg:p-10">
+      <div class="canvas-midnight-deep relative isolate mt-14 flex flex-col items-start justify-between gap-7 overflow-hidden rounded-[1.75rem] p-8 lg:mt-16 lg:flex-row lg:items-center lg:p-10">
+        <img src="${img(C.imageAssets.og)}" alt="" loading="lazy" decoding="async" class="absolute inset-0 -z-10 h-full w-full object-cover object-center">
+        <span aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 bg-gci-midnight/78"></span>
         <div class="max-w-[36rem]">
           <h3 class="display text-[clamp(1.25rem,5vw,1.95rem)] text-white">Confirm what is available at your address</h3>
           <p class="mt-3.5 text-[0.9375rem] leading-relaxed text-white/70">Available speeds, bundle eligibility and installation windows are determined at the street level. A brief call confirms your options, and the order can be completed during that same call.</p>
@@ -646,7 +648,9 @@ fs.writeFileSync(
     title: C.site.metaTitle,
     description: C.site.metaDescription,
     body: indexBody,
-    ogImage: 'assets/images/og-image.jpg',
+    // Absolute, not relative: social crawlers cannot resolve a relative
+    // og:image. Regenerate after setting NEXT_PUBLIC_SITE_URL to a real domain.
+    ogImage: `${C.site.siteUrl}/assets/images/og-image.jpg`,
   }),
 );
 console.log('wrote index.html');

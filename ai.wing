@@ -7,6 +7,41 @@ Format: newest entry at the top. Each entry records what changed and why.
 
 ---
 
+## [3.1.2] — OG image: a real bug, and a wasted photograph
+
+Prompted by "why is the og image not included at all".
+
+### It was included — but the static build's URL was broken
+
+Both builds did emit `og:image`. An OG image never appears on the page itself;
+it only renders when the link is shared. So nothing was missing on screen by
+design.
+
+But checking it surfaced a genuine defect: **the static build emitted a
+relative path**, `assets/images/og-image.jpg`. OpenGraph requires an absolute
+URL — Facebook, LinkedIn and X crawlers cannot resolve a relative one, so the
+share card would simply not have rendered. Now built from `site.siteUrl`, and
+`og:image:width`, `og:image:height` and `twitter:image` were added alongside,
+which crawlers use to lay the card out before the image downloads.
+
+The Next build was already absolute via `metadataBase`. Verified with a real
+domain set: both builds now emit a fully-qualified URL with dimensions.
+
+### The photograph was doing almost nothing
+
+Fair point behind the question: a good frame was earning its keep only as a
+share card. It now sits behind the **"Confirm what is available at your
+address" CTA band** in Why GCI, which was flat navy before.
+
+Lit homes in a remote coastal community at dusk, under a 78% navy scrim — it is
+the literal subject of the sentence next to it, and the same frame still serves
+as the share card, so no extra asset ships.
+
+Verified: image loads in both builds, white text stays fully legible over the
+scrim, zero broken images, no console errors.
+
+---
+
 ## [3.1.1] — Vercel build failure and security upgrade
 
 ### The build failure

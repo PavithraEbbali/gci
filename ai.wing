@@ -1,0 +1,579 @@
+# ai.wing — Changelog
+
+Structural changes, feature additions and component creations for the
+GCI Authorized Retailer landing site.
+
+Format: newest entry at the top. Each entry records what changed and why.
+
+---
+
+## [3.0.0] — Static HTML build
+
+The whole site now also exists as plain HTML, CSS and vanilla JavaScript in
+`html/`. No React, no Node server, no build step to run it — `index.html`
+opens straight off the filesystem.
+
+### Approach
+
+Not a hand transcription. The markup is **generated from the same
+`lib/content.ts` the Next app reads**, via esbuild bundles of the content and
+legal modules, so the two builds cannot drift apart. The stylesheet is compiled
+by Tailwind from the same `@theme` token block against the generated HTML, so
+the class names and resulting CSS are the same ones the app uses.
+
+`npm run build:html` runs the whole pipeline: bundle content, generate pages,
+compile CSS, copy JS and images.
+
+### What was ported, and how
+
+| Effect | Replacement |
+|---|---|
+| Lenis smooth scroll | Lenis from CDN, same settings, guarded so a failed load degrades to native scrolling |
+| Hero entrance | Already CSS keyframes — copied as-is |
+| Scroll reveals, stagger grids | IntersectionObserver toggling `.is-in`, CSS transitions carry the motion |
+| Clip-path section wipes | Same mechanism, on `clip-path` |
+| Parallax | Scroll handler batched into one rAF tick |
+| SVG speed-path draw | `getTotalLength()` feeding a dash-offset transition |
+| Magnetic buttons | Pointer tracking with eased follow; label still parallaxes at 42% |
+| 3D card tilt | Pointer tracking, still capped at 7° |
+| Aurora canvas | Ported verbatim — it was already vanilla canvas |
+| Marquee, medallion orbits and glow | Already pure CSS |
+| ZIP checker, FAQ accordion, mobile menu, scroll-spy | Plain event handlers |
+
+### Verified against the running Next app
+
+Both served side by side and compared:
+
+- Section order identical; 7 images, 0 broken, in both
+- Page height 14,835 vs 14,903 px — within 0.5%
+- Zero JS errors and zero console errors in both
+- Hero renders pixel-identical, including medallion, orbits, glow and photo
+- ZIP checker: all three states correct
+- Reveals 47/51 fired, wipes 8/8, stagger grids 6/6, speed-path 1/1
+- FAQ stays single-open and moves the `aria-expanded` state correctly
+- Tilt measured at `rotateX(3.5deg) rotateY(-4.22deg)`, magnetic label at 42%
+  of body travel — matching the React implementation
+- Legal pages: 8 cross-links and 8 footer links, CSS loaded, no errors
+- `file://` verified: CSS, canvas, medallion and images all work by
+  double-clicking, with no errors
+
+Playwright's synthetic pointer does not trigger tilt or magnetic in headless
+for **either** build, so that was confirmed as a harness artifact rather than a
+regression by dispatching the events directly.
+
+---
+
+## [2.3.1] — Hero CTA removed, offer medallion emphasised
+
+- **The hero "Call to order" button is gone.** It had been removed once already
+  at the user's request and then reintroduced by mistake during the 2.3.0 hero
+  rebuild, copied across from the kineticfiber reference. The hero's only
+  action is now the ZIP checker; the header carries the call path.
+- **The medallion carries the emphasis on its own**, since it is the only thing
+  left in that column:
+  - a breathing glow behind it (opacity + scale, 6s)
+  - two counter-rotating dotted orbits — fine red dots inside, wider glacier
+    blue dashes outside (34s and 52s, opposite directions)
+  - an inner hairline so the seal has an edge rather than a flat fill
+  - larger: `clamp(16rem, 28vw, 21rem)`
+  - lifts slightly on hover
+- The medallion is now a link to the offers rail with a "See all offers"
+  affordance inside it, so it does something without becoming a second call
+  button.
+
+All medallion animation is transform and opacity only, so it stays on the
+compositor, and the reduced-motion block stops every piece of it.
+
+---
+
+## [2.3.0] — Hero rebuilt against the reference sites
+
+The right-hand box read as a generic template block: eyebrow, title,
+paragraph, three check-bullets, text link. Looked at both reference heroes and
+neither uses that pattern.
+
+- **bestfiberinternet.us** — centred single column, no side card at all. The
+  ZIP checker is the focal element in a raised panel, with reassurance
+  microcopy beneath it and inclusions as a horizontal check-strip below.
+- **kineticfiber.us** — inset rounded panel, copy left with an *inline price
+  anchor* ("fiber plans start at $19.99/mo"), photo right with a bold circular
+  offer badge overlapping it, then a check-strip below.
+
+The shared language is: inclusions run horizontally, the offer is a bold
+graphic element, and the price is anchored inline with the copy. None of that
+was true of the old card.
+
+### What changed
+
+- **The card is gone.** In its place, a circular offer medallion in brand red
+  with an offset outer ring — eyebrow, product, a large "On us", and the
+  qualifier. Short lines only, because a circle has no room for prose. The
+  "Call to order" button now sits under it.
+- **Inline price anchor added** to the copy column, rendered through the
+  existing `PriceLockup` and fed by `entryInternetPlan()`, which picks the
+  cheapest published fiber plan. The hero's "from" price therefore cannot
+  drift away from the plan grid below it.
+- **Inclusions moved to a horizontal check-strip** at the foot of the hero,
+  replacing the speed marquee that used to sit there. The ticker requirement is
+  still met by the trust marquee in the Offers section.
+- **Reassurance microcopy** under the ZIP field: free to check, no obligation.
+- **Stat strip removed from the hero.** Its three figures — 15,000 miles, 80%,
+  2.5 Gbps — are already metric cards in the Why GCI section, so the hero was
+  repeating itself and had grown too tall.
+- `heroPromos` and `speedMarquee` deleted from `lib/content.ts` rather than
+  left behind as dead data that would read as live to the next editor.
+
+---
+
+## [2.2.0] — Icon set
+
+New `components/ui/Icon.tsx`: 19 inline glyphs sharing one grammar — 24x24 box,
+no fill, 1.8 stroke, round caps and joins, inheriting `currentColor`. Inline
+rather than an icon package, because this is nineteen glyphs and a dependency
+would ship several hundred plus a runtime to choose between them.
+
+Icon choice lives in `lib/content.ts`, not in components: `ServiceSection`,
+`SpecialOffer` and `FeatureItem` each gained a typed `icon` field, so swapping
+a glyph is a one-line data edit and TypeScript rejects a name that does not
+exist.
+
+### Placement
+
+| Where | Icon | Why |
+|---|---|---|
+| Plan card feature bullets | `check` | Replaced plain dots — a tick reads as "included", a dot does not |
+| Plan card speed stats | `download` / `upload` | Direction was carried by the word alone |
+| Plan card badge row | Service glyph in a tinted circle | Visual anchor on an otherwise text-only card |
+| Section eyebrows | Service glyph | Wayfinding between the four lines |
+| Why GCI cards | Per-card glyph in a tinted circle | Balances the large metric on the left |
+| Offer cards | Category glyph | Distinguishes device, bundle, tablet and accessory offers at a glance |
+
+### Two things worth noting
+
+- **The first `fiber` glyph was redrawn.** As a branching strand it turned to
+  mush at 16px on the plan cards. Rewritten as signal arcs radiating from a
+  node, which survives the size.
+- **The plan-card service glyph is decoration, not information** — every card
+  within a section shares its service line. It is kept because a text-only
+  card needs a visual anchor, but it is tinted back so it does not compete
+  with the badge beside it.
+
+No brand logos are drawn. The offer cards for Apple and Samsung promotions use
+generic device glyphs; rendering those companies' marks would be using their
+trademarks as iconography.
+
+---
+
+## [2.1.1] — Hero overlay, hero CTA, headings, footer year
+
+- **Hero "Call to order" button removed.** The ZIP checker is now the only
+  action in the hero; the header's call button and the ZIP success state still
+  carry the phone path.
+- **Offers heading** → "Current promotions and device offers".
+- **Fiber heading** → "Residential internet plans and pricing".
+- **Footer copyright year removed**; `new Date().getFullYear()` dropped with it.
+- **`metadataBase` set** (surfaced by a dev-server warning): without it Next
+  resolved the OpenGraph and Twitter image URLs against localhost, which would
+  have shipped broken link previews. Added `site.siteUrl`, overridable with
+  `NEXT_PUBLIC_SITE_URL` — **this is a placeholder and needs the real domain
+  before launch.**
+
+### Hero overlay — what actually happened
+
+The overlay was removed as asked, and then measured. Sampling the photograph
+itself against the text colours:
+
+| Element | Contrast with no overlay | AA needs |
+|---|---|---|
+| H1, 65px bold | 10.5:1 | 3:1 |
+| Subheadline, 17px | **1.7:1** | 4.5:1 |
+| ZIP label, 13px | **2.0:1** | 4.5:1 |
+
+Body copy was genuinely unreadable, not merely low-contrast. Darkening the text
+to the darkest colour in the GCI palette only reached 4.3:1, and that region of
+the frame ranges down to near-black, so parts of the copy would have vanished
+entirely.
+
+A search over 125 crop and scale combinations found only 30 that clear 4.5:1,
+and every one of them puts the copy over featureless sky — the photograph's
+bright region carries no detail and its interesting region is too dark to sit
+dark text on.
+
+Resolution: the wash is now **confined to the copy column** — opaque at the
+left edge, fully transparent past 56% of the width. The ridge, the tidal flats
+and everything around the offer card are untouched at full strength, which is
+considerably more of the photograph than was visible before. Mobile keeps a
+lighter full-width wash because the copy spans the full width there.
+
+---
+
+## [2.1.0] — Photography
+
+Eight photographs added and wired through `imageAssets` in `lib/content.ts`,
+so swapping any picture is a one-line change with no component edits.
+
+### Asset pipeline
+
+- Files arrived as PNG, 3.4–6.7 MB each, **41 MB total**. Converted to mozjpeg
+  at q82 with 4:4:4 chroma: **1.2 MB total**, a 97% reduction with no visible
+  loss. Originals removed.
+- **Every image carried a Gemini sparkle watermark** in the bottom-right,
+  consistently ~93 px in from the right edge and ~95 px up from the bottom.
+  Cropped 170 px off the right edge of each file to remove it, then verified by
+  stitching all eight bottom-right corners into one strip and inspecting it.
+  An AI-generation watermark on a live commercial page is not something to
+  ship.
+- `og-image` additionally re-cropped to a true 1200×630 for link previews.
+
+### Where they went
+
+| Image | Placement | Treatment |
+|---|---|---|
+| `hero-background` | Full-bleed behind the hero | White scrim, `priority` for LCP |
+| `offers-lifestyle` | Behind the red lead offer card | Luminosity blend under a brand-red wash |
+| `section-fiber/bundles/mobile/phone` | Paired with each service heading | Rounded figure, 16:10 |
+| `why-network` | A two-column tile inside the Why GCI metric grid | Gradient scrim + caption |
+| `og-image` | OpenGraph and Twitter card metadata | — |
+
+All served through `next/image` with explicit `sizes`, so the browser pulls a
+responsive WebP/AVIF rather than the source JPG. Verified zero broken images
+and correct intrinsic sizes on the rendered page.
+
+### Layout changes this forced
+
+- **Service section headings are now a two-column row** — copy left, photograph
+  right — where previously the right half sat empty.
+- **The hero scrim had to become two scrims.** One direction cannot serve both
+  layouts: on desktop the copy occupies the left half so the wash falls off
+  left-to-right, but on a phone the copy spans full width and a horizontal wash
+  buried the photo completely. Mobile now gets a vertical wash that stays
+  lighter through the middle band.
+- **`SpeedPath` moved out of the fiber photograph into its own band.** Drawn
+  over the photo the strokes had nothing to read against and looked like
+  scratches on the image. In a dedicated band between the heading and the plan
+  grid, the four lines fanning into four nodes visibly echo the four tiers
+  directly below.
+- Why GCI caption shortened and the figure's min-height raised, because the
+  original two-line caption was crowding the bottom edge of its frame.
+
+### Alt text
+
+Decorative images (hero, offers backdrop, og) carry `alt=""` so assistive tech
+skips them. The four section photographs and the network tile carry real
+descriptive alt text, since they convey content rather than decoration.
+
+---
+
+## [2.0.1] — Final verification pass
+
+Caught by re-running the constraint sweep and a DOM audit against the built
+site, after an unrelated process took port 3000 and the dev server had to be
+moved to **3010** (`.claude/launch.json` updated).
+
+- **`RevealText` accent join produced one merged word.** The gap between the
+  base phrase and the accent phrase was a CSS-width spacer (`w-[0.3em]`), which
+  renders visually but does not exist in the text layer — so the Why GCI
+  heading read "networkinvestment" to assistive tech, to copied text and to
+  search engines. Replaced with a real non-breaking space emitted by the last
+  base word; the spacer element is gone.
+- **Two Why GCI card rewrites had silently not applied** in an earlier batch
+  (quote-escaping mismatch meant the replace was a no-op and nothing warned).
+  The "#1" card now reads "Independently rated fastest in Alaska" with the
+  rewritten body, matching the rest of the section's register.
+
+### Verified on the built site
+
+- Section order: top → offers → fiber → bundles → mobile → phone → fine-print
+  → why-gci → faq. No `#tv` or `#cable` section exists.
+- Constraint sweep, all false: support routing, "ordering channel", competitor
+  bashing, date stamps, broadband-label links, "official site" FAQ, GCI's own
+  support number, and any trace of the old placeholder brand name.
+- Only two call-to-action label strings exist site-wide: "Call to order" and
+  the header/footer "Call (855) 555-0142". Zero raw phone numbers used as
+  interactive labels inside `<main>`.
+- Hero carries the ZIP checker, the "Call to order" button, the featured
+  iPhone 18 Pro offer, and no "or dial" line.
+- Eight legal links in the footer.
+- `tsc --noEmit` clean; `next build` clean, 12/12 routes static, 173 kB first
+  load.
+
+---
+
+## [2.0.0] — Light-theme rebuild, GCI branding, offers rail, new footer
+
+### Theme: dark → light, vibrant
+
+- The site now reads white-dominant, the way gci.com does. `globals.css`
+  replaces the dark canvases with `.canvas-hero`, `.canvas-white`,
+  `.canvas-tint` (#f2f5fa) and two dark accents kept for the footer and the
+  closing CTA band. Brand red carries action, glacier blue carries energy.
+- **Palette is locked to the scraped GCI tokens.** A computed-style audit was
+  run across every element on the rendered page, checking `color`,
+  `background-color` and all four border colours against the allowed list.
+  Result: zero off-palette values in the application DOM. (One `#757575`
+  appears inside the Next.js dev-overlay shadow root, which does not ship.)
+- Hero backdrop rewritten: `BlackHole.tsx` (dark void, lensed starfield) →
+  `AuroraField.tsx`, a light refracting lens with drifting particles and
+  aurora ribbons, composited with normal alpha because additive blending
+  washes to white on a light canvas.
+
+### Navbar seam
+
+- The header previously faded from transparent over a dark hero, which left a
+  visible divider line where the utility bar met the hero canvas, and rendered
+  the white wordmark invisible against the white body behind it.
+- Replaced with gci.com's own structure: a charcoal (`#303139`) utility bar
+  that scrolls away, and a header that is solid white from first paint with a
+  shadow that appears on scroll. The hero no longer needs the negative-margin
+  pull-up, so the seam is gone by construction.
+
+### Branding
+
+- `site.brandName` is now **GCI** with `brandSuffix: 'Authorized Retailer'`.
+  The former placeholder name is removed from every surface — header, footer,
+  hero, metadata and all eight legal pages (verified: zero occurrences in
+  source or rendered output).
+- `lib/legal.ts` was rewritten so the policies read in the first person
+  ("we", "this site") rather than naming a separate company, which would have
+  been nonsensical once the brand became GCI.
+- The persistent "Independent Authorized Retailer of GCI." disclosure bar
+  stays at the top of every page, and the footer carries the full trademark
+  attribution to GCI Communication Corp.
+
+### Current offers
+
+- New `specialOffers` array in `lib/content.ts`, transcribed from gci.com:
+  iPhone 18 Pro on us, free unlimited mobile for a year, iPhone 17 Pro for $0,
+  up to $1,000 off Galaxy S26, iPhone 17e on us, $350 off iPad Air (M4), 30%
+  off three or more accessories.
+- The featured offer (iPhone 18 Pro) now occupies the hero's right-hand card.
+- New `components/sections/Offers.tsx` renders the full promotions rail: a
+  large red lead card with qualifying points, plus a six-card grid. Sits
+  directly after the hero, and is linked from the nav as "Deals".
+
+### Copy — professional rewrite
+
+Every heading and standfirst called out for revision was rewritten:
+
+| Section | Now reads |
+|---|---|
+| Hero | "Alaska's fastest internet, built on the Fiber+ network." |
+| Fiber+ | "Choose the speed tier that fits your household" |
+| Bundles | "Internet and mobile on a single bill" |
+| Mobile | "Nationwide coverage on Alaska's fastest 5G network" |
+| Phone | "Reliable landline service with unlimited calling" |
+| Fine print | "Every charge, shown side by side" |
+| Why GCI | "Four decades of network investment in Alaska" |
+| CTA band | "Confirm what is available at your address" |
+| FAQ | "Frequently asked questions" |
+
+Supporting paragraphs were rewritten in the same register — declarative,
+specific, no folksy asides.
+
+### Hero
+
+- Removed the "or dial (855) 555-0142" secondary line. The prominent
+  "Call to order" button is retained, since the brief's hard constraint
+  requires the hero to carry both a ZIP checker and a call button.
+
+### Plan cards
+
+- The "Call to order" button moved to the **bottom** of every card, with
+  `mt-auto` pinning it to the card's lower edge so every CTA in a row sits on
+  a common baseline regardless of how many feature bullets a plan carries.
+
+### Footer — rebuilt on the reference layout
+
+- Four-column top band: brand and tagline, SHOP column, LEARN column, and a
+  "Talk to a human" column with the phone number set large, plus hours and
+  location.
+- Full **OFFER DETAILS & REQUIRED DISCLOSURES** block driven by
+  `footerDisclosures` in `lib/content.ts` — ten disclosure paragraphs covering
+  internet, data allowances, bundles, mobile, roaming, streaming device, home
+  phone, Atmos Rewards, equipment and general terms. Rendered in two columns
+  on desktop.
+- Bottom bar carries all eight legal pages, a compliance contact line and the
+  trademark copyright.
+- Deliberately **omitted** the reference site's "Pricing current as of
+  [date]" line, since the brief prohibits date stamps.
+
+### Other fixes
+
+- `RevealText` word masks now reserve `0.2em` below the baseline so descenders
+  are not clipped in headlines.
+- Accent gradients constrained to the blue ramp (`#007aa1 → #00a9e0`); the
+  previous blue→red gradient passed through a muddy grey mid-tone.
+- Anchor targets get `scroll-margin-top` so the sticky header never covers a
+  section heading after an in-page jump.
+
+---
+
+## [1.0.1] — QA pass
+
+Fixes found by rendering the built site in a real browser at 1440px and 390px.
+
+### Correctness
+
+- **Hero entrance moved from JS to CSS.** The `<h1>` is the LCP element and was
+  shipping at `opacity: 0` behind a Framer Motion `animate`, so it stayed blank
+  anywhere the animation loop was throttled and cost LCP unnecessarily. It now
+  uses `@keyframes rise-in` with `animation-fill-mode: backwards`, so the
+  resting state is visible and the hidden state exists only while the animation
+  is pending. Below-the-fold scroll reveals stay on Framer Motion, which is what
+  they are for.
+- **Header now overlays the hero.** The sticky header sat *above* the hero in
+  flow, leaving a white band across the top and rendering the white wordmark
+  invisible against it. The hero is pulled up under the header with a matching
+  negative margin and compensating padding.
+- **FAQ sticky column restored.** The section carried `overflow-hidden`, which
+  gave the sticky intro column a scrolling ancestor that never scrolls, so it
+  silently stopped sticking. Removed — nothing in that section overflows.
+- **Corrected a date claim.** "Forty years" understated GCI's history; gci.com
+  dates the company to 1979. Copy now anchors on the year, and the fiber-backbone
+  card reads "more than four decades".
+- **Removed two raw phone numbers used as interactive labels inside `<main>`.**
+  The hero's secondary line is now plain text, and the ZIP success CTA reads
+  "Call to order". Raw numbers remain only in the header, mobile menu and footer.
+
+### Layout and polish
+
+- Speed readouts split the numeral from the unit (`splitSpeed()`), so
+  "500 Mbps" no longer wraps to two lines in a four-across grid.
+- Plan-card name and tagline reserve fixed heights, so the speed, price and CTA
+  rows line up across cards even when one plan name wraps.
+- Badge slot is a fixed `h-7` whether or not a badge is present, removing a 3px
+  vertical offset between the featured card and its neighbours.
+- Scroll-spy clears the nav highlight once no service section owns the viewport,
+  instead of leaving the last one lit through the FAQ and footer.
+- Black-hole backdrop softened — hairline photon ring, wider and fainter bloom,
+  smaller radius — so it reads as atmosphere rather than a drawn circle. On
+  phones the void sits higher so it no longer sits behind the ZIP field.
+- Promo pill label no longer breaks across two lines on narrow screens.
+- Frosted header raised to 93% opacity so body copy does not read through it.
+
+### Verified
+
+- `tsc --noEmit` clean; `next build` clean, 12/12 routes static.
+- Rendered and reviewed at 1440×900 and 390×844: hero, all four service
+  sections, fine-print grid, Why GCI, FAQ, footer, mobile menu, ZIP checker
+  success state, and a legal page.
+- Constraint sweep run against the live DOM: no support-routing copy, no
+  broadband-label links, no date stamps, no competitor bashing, no TV or cable
+  section, no "official site" FAQ, every plan CTA reads "Call to order".
+
+---
+
+## [1.0.0] — Initial build
+
+### Research & source of truth
+
+- **Scraped `https://www.gci.com` design-token layer** to extract the official
+  brand palette. Resolved the `--colors-colors-*` custom properties from GCI's
+  live stylesheet rather than eyeballing screenshots:
+  - `#b71234` brand red (hover `#9b0f2c`, pressed `#800d24`)
+  - `#042046` midnight blue · `#073473` link midnight
+  - `#00a9e0` glacier blue · `#31ccff` glacier bright · `#007aa1` glacier deep
+  - `#23252a` darkest · `#303139` dark · `#5e636e` mid · `#c6c9d2` light
+  - `#e1e4ea` border · `#f2f5fa` lightest
+- **Typography audit**: GCI ships Gotham (Light/Book/Medium/Bold). Paired
+  Montserrat (closest freely-licensable geometric sans) for display with Inter
+  for body copy.
+- **Service-line audit** against gci.com. Findings drove which sections exist:
+
+  | Line | Finding | Action |
+  |---|---|---|
+  | Fiber+ Internet | 4 live tiers | Built |
+  | Cable | No separate cable lineup — one residential internet lineup runs over the hybrid Fiber+ build | **Omitted** |
+  | Bundles (GCI+) | 4 live bundles | Built |
+  | TV | `/tv` redirects to homepage; `/tv/plans` and `/yukon-tv` return 404 | **Omitted entirely** |
+  | Mobile | 4 live plans | Built |
+  | Home Phone | 3 live plans | Built |
+
+- All plan data (prices, speeds, caps, overage increments, fees, promo terms)
+  transcribed from GCI's own plan pages and broadband disclosures.
+
+### Architecture
+
+- **`lib/content.ts` — single source of truth.** Every price, speed, plan name,
+  feature bullet, fee row, FAQ and nav link originates here. No component
+  hard-codes content. Exposes `PlanItem`, `ServiceSection`, `FinePrintRow`,
+  `FeatureItem`, `FaqItem` plus helpers `formatSpeed()`, `ctaLabel()` and
+  `plansFor()`.
+  - `ctaLabel()` enforces the CTA rule: `"Call to order"` when a plan has a
+    published price, `"Call for pricing"` when it does not.
+  - `serviceSections` drives the page — adding or removing a line there adds or
+    removes a whole section with no component changes.
+- **`lib/legal.ts`** — structured content for the eight required legal pages.
+- Strict-frontend throughout: no API routes, no database, no server actions.
+  The ZIP checker evaluates Alaska ZIP prefixes in the browser and stores
+  nothing.
+
+### Components created
+
+**Providers**
+- `components/providers/LenisProvider.tsx` — Lenis smooth scrolling, anchor
+  links routed through it, fully disabled under `prefers-reduced-motion`.
+
+**UI primitives**
+- `components/ui/PriceLockup.tsx` — universal `<PriceLockup plan={plan} />`.
+  Raised dollar sign, 2.5–3.5rem integer, muted raised cents, optional struck
+  regular price, tabular numerals, single clean screen-reader utterance.
+  Degrades to "Custom pricing" when no price is published.
+- `components/ui/MagneticButton.tsx` — magnetic cursor-follow CTA with spring
+  return; label parallaxes at 42% of body travel. Five variants, three sizes.
+- `components/ui/TiltCard.tsx` — 3D tilt on mouse-move for plan cards, capped
+  at 7° so pricing stays legible, with a cursor-tracked specular highlight.
+- `components/ui/Reveal.tsx` — `RevealText` (per-word clip-mask headline
+  reveal), `Reveal` (fade + lift), `StaggerGrid` / `StaggerItem`.
+- `components/ui/Motion.tsx` — `Parallax` (scroll-linked depth drift),
+  `SectionWipe` (clip-path wipe between service sections), `Marquee`
+  (seamless infinite ticker, pauses on hover, edge-masked), `SpeedPath`
+  (SVG path-draw visualising the speed tiers).
+- `components/ui/BlackHole.tsx` — canvas deep-space hero backdrop: lensed
+  starfield, breathing photon ring, aurora ribbons in glacier blue and brand
+  red. DPR capped at 1.5, rAF suspended via IntersectionObserver when
+  off-screen, disabled entirely under reduced-motion.
+
+**Sections**
+- `components/sections/Header.tsx` — persistent top disclosure bar plus sticky
+  header that transitions transparent → frosted on scroll, with scroll-spy
+  anchor nav (shared `layoutId` pill) and a call CTA. Exports `PhoneGlyph`.
+- `components/sections/Hero.tsx` — black-hole backdrop, live-promo pill,
+  gradient headline, **both** the ZIP availability checker **and** a prominent
+  "Call to order" button, stat strip, promo card, speed ticker.
+- `components/sections/PlanSection.tsx` — one generic section rendering any
+  service line from `content.ts`; tilt plan cards, `PriceLockup`, policy chips.
+- `components/sections/FinePrintGrid.tsx` — trust marquee plus the inclusions
+  and fees grid; real `<table>` on desktop, per-service stacks on mobile.
+- `components/sections/WhyGci.tsx` — staggered feature grid over parallax glow
+  plates, closing CTA band.
+- `components/sections/Faq.tsx` — accordion with sticky intro column, full
+  `aria-expanded` / `aria-controls` wiring.
+- `components/sections/Footer.tsx` — dark premium footer with reseller
+  disclosure and all eight legal links.
+
+**Routes**
+- `app/page.tsx` — composes the fixed section order.
+- `app/legal/[slug]/page.tsx` — statically generated legal pages with a sticky
+  cross-index of all eight.
+- `app/globals.css` — GCI tokens as a Tailwind v4 `@theme`, layout primitives,
+  atmosphere utilities, marquee keyframes, reduced-motion overrides.
+
+### Compliance with the negative constraints
+
+- No support-routing copy anywhere — nothing tells a user to contact GCI for
+  billing, outages or support.
+- Hero carries both the ZIP checker and a prominent call button.
+- Every plan-card and section CTA reads "Call to order"; raw phone numbers
+  appear only in the header, footer and as literal contact information.
+- No competitor bashing; no "ordering channel" language.
+- No section exists for a service GCI does not sell; no empty placeholders.
+- No links to official Broadband Facts labels.
+- No "Pricing observed [date]" stamps.
+- No FAQ about official-site status or retailer legal structure.
+
+### Notes for the next editor
+
+- `site.phoneDisplay` / `site.phoneHref` in `lib/content.ts` hold a placeholder
+  in the reserved 555-01xx fictional range. **Replace both before launch.**
+- To change any price: edit `lib/content.ts` only.
